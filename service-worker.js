@@ -1,6 +1,8 @@
-const CACHE_NAME = "mmm-remote-control-v4.8.2-basepath";
+const CACHE_NAME = "mmm-remote-control-v4.8.2-layoutpreview3";
 const urlsToCache = [
   "./remote.html",
+  "./modules/MMM-Remote-Control/layout-preview.js",
+  "./modules/MMM-Remote-Control/layout-preview.css",
   "./css/main.css",
   "./css/roboto.css",
   "./css/font-awesome.css",

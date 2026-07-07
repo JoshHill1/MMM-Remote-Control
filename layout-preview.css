@@ -1,0 +1,228 @@
+/* Layout preview (edit menu) — see layout-preview.js */
+
+#layout-preview {
+  margin: var(--spacing-md, 10px) 0;
+  max-width: 480px;
+}
+
+/* Header row: title, unsaved badge, reset button */
+
+.lp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 6px;
+}
+
+.lp-title {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dimmed, #888);
+}
+
+.lp-badge,
+.lp-save,
+.lp-reset {
+  display: none;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+
+.lp-badge {
+  color: #ffd35c;
+  border: 1px solid rgba(255, 211, 92, 0.5);
+  background: rgba(255, 211, 92, 0.12);
+}
+
+.lp-reset {
+  cursor: pointer;
+  color: var(--text-color, #bbb);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  font-family: inherit;
+}
+
+.lp-reset:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lp-save {
+  cursor: pointer;
+  color: #9fd49f;
+  border: 1px solid rgba(140, 220, 140, 0.5);
+  background: rgba(140, 220, 140, 0.12);
+  font-family: inherit;
+}
+
+.lp-save:hover {
+  background: rgba(140, 220, 140, 0.22);
+}
+
+.lp-save:disabled,
+.lp-reset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#layout-preview.lp-dirty .lp-badge,
+#layout-preview.lp-dirty .lp-save,
+#layout-preview.lp-dirty .lp-reset {
+  display: inline-block;
+}
+
+/* Miniature screen: wireframe grid of MagicMirror regions */
+
+.lp-screen {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    "top_bar top_bar top_bar"
+    "top_left top_center top_right"
+    "upper_third upper_third upper_third"
+    "middle_center middle_center middle_center"
+    "lower_third lower_third lower_third"
+    "bottom_left bottom_center bottom_right"
+    "bottom_bar bottom_bar bottom_bar";
+  grid-template-rows: auto auto auto minmax(48px, 1fr) auto auto auto;
+  gap: 4px;
+  padding: 6px;
+  min-height: 340px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--border-radius, 8px);
+  background: rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s;
+}
+
+#layout-preview.lp-dirty .lp-screen {
+  border-color: rgba(255, 211, 92, 0.7);
+}
+
+.lp-cell[data-region="top_bar"] {
+  grid-area: top_bar;
+}
+.lp-cell[data-region="top_left"] {
+  grid-area: top_left;
+}
+.lp-cell[data-region="top_center"] {
+  grid-area: top_center;
+}
+.lp-cell[data-region="top_right"] {
+  grid-area: top_right;
+}
+.lp-cell[data-region="upper_third"] {
+  grid-area: upper_third;
+}
+.lp-cell[data-region="middle_center"] {
+  grid-area: middle_center;
+}
+.lp-cell[data-region="lower_third"] {
+  grid-area: lower_third;
+}
+.lp-cell[data-region="bottom_left"] {
+  grid-area: bottom_left;
+}
+.lp-cell[data-region="bottom_center"] {
+  grid-area: bottom_center;
+}
+.lp-cell[data-region="bottom_right"] {
+  grid-area: bottom_right;
+}
+.lp-cell[data-region="bottom_bar"] {
+  grid-area: bottom_bar;
+}
+
+.lp-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 36px;
+  padding: 15px 4px 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
+.lp-cell.lp-drop-target {
+  border-color: rgba(140, 190, 255, 0.9);
+  border-style: solid;
+  background: rgba(140, 190, 255, 0.08);
+}
+
+.lp-cell-label {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Tray row for fullscreen_above / fullscreen_below (only rendered when used) */
+
+.lp-extra {
+  display: flex;
+  gap: 4px;
+  margin-block-start: 4px;
+}
+
+.lp-extra .lp-cell {
+  flex: 1;
+}
+
+/* Module blocks */
+
+.lp-block {
+  --lp-color: hsl(0, 0%, 60%);
+  --lp-color-bg: hsla(0, 0%, 60%, 0.16);
+
+  border: 1px solid var(--lp-color);
+  border-left-width: 4px;
+  border-radius: 3px;
+  background: var(--lp-color-bg);
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-color, #ddd);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.lp-block.lp-hidden {
+  opacity: 0.4;
+}
+
+.lp-block.lp-dragging {
+  opacity: 0.35;
+}
+
+.lp-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0.9;
+  cursor: grabbing;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Color swatch linking a list row to its preview block */
+
+.lp-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-inline: 2px 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
