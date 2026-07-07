@@ -291,9 +291,32 @@ Module.register("MMM-Remote-Control", {
       const shouldShow = notification === "SHOW" || (notification === "TOGGLE" && module.hidden);
 
       if (shouldHide) {
-        module.hide(1000, () => {}, options);
+        module.hide(1000, () => this.restoreStuckSiblings(module), options);
       } else if (shouldShow) {
         module.show(1000, () => {}, options);
+      }
+    }
+  },
+
+  /**
+   * Re-show visible modules whose DOM wrapper is stuck in the hidden state.
+   * MagicMirror marks hidden modules with an inline `position: fixed` and
+   * blanks a whole region once no wrapper in it is static — so a sibling
+   * stuck at `position: fixed` (e.g. by an interrupted updateDom animation)
+   * would make hiding one module blank every module sharing its position.
+   * @param {object} hiddenModule - Module that was just hidden
+   */
+  restoreStuckSiblings (hiddenModule) {
+    const {position} = hiddenModule.data;
+    if (!position) { return; }
+
+    const siblings = MM.getModules().filter((module) => module !== hiddenModule && module.data.position === position);
+    for (const sibling of siblings) {
+      if (sibling.hidden || (sibling.lockStrings || []).length > 0) { continue; }
+      const wrapper = document.getElementById(sibling.identifier);
+      if (wrapper && wrapper.style.position === "fixed") {
+        Log.warn(`${this.name}: ${sibling.identifier} was stuck invisible in region ${position}, re-showing it`);
+        sibling.show(0, () => {});
       }
     }
   },
@@ -393,9 +416,15 @@ Module.register("MMM-Remote-Control", {
     const allModules = MM.getModules();
     const filters = Array.isArray(filter) ? filter : [filter];
 
-    return allModules.filter((module) => {
+    const matches = allModules.filter((module) => {
       if (!module) return false;
       return filters.some((f) => module.identifier === f || module.name === f);
     });
+
+    if (!Array.isArray(filter) && matches.length > 1) {
+      Log.warn(`${this.name}: "${filter}" matched ${matches.length} module instances: ${matches.map((module) => module.identifier).join(", ")}`);
+    }
+
+    return matches;
   }
 });
