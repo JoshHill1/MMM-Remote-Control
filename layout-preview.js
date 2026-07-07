@@ -50,14 +50,27 @@
 
   const DRAG_THRESHOLD_PX = 6;
 
+  const COLORS_STORAGE_KEY = "mmrc_lp_colors";
+
+  function loadColorOverrides () {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(COLORS_STORAGE_KEY) ?? "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
   const state = {
-    modules: [], // [{identifier, name, position, hidden, header}]
+    modules: [], // [{identifier, name, label, position, hidden, header}]
     byIdentifier: new Map(),
     baseline: null, // {region: [identifier, ...]} as currently configured
     arrangement: null, // {region: [identifier, ...]} pending (drag-edited)
     dirty: false,
     remote: null, // Remote object, handed over by the loadVisibleModules hook
-    saving: false
+    saving: false,
+    colorOverrides: loadColorOverrides(), // module label -> "#rrggbb"
+    defaultHues: null // Map(label -> hue), collision-free per module set
   };
 
   /* ---------- colors ---------- */
@@ -67,15 +80,70 @@
     for (const char of String(name)) {
       hash = (hash * 31 + char.codePointAt(0)) >>> 0;
     }
-    return hash % 360;
+
+    /*
+     * Knuth multiplicative scramble: labels differing by one character
+     * ("weather 1" vs "weather 2") must still land on far-apart hues.
+     */
+    return (Math.imul(hash, 2_654_435_761) >>> 0) % 360;
   }
 
+  function hslToHex (h, s, l) {
+    s /= 100;
+    l /= 100;
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    const toHex = (v) => Math.round(v * 255).toString(16).padStart(2, "0");
+    return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+  }
+
+  function hueDistance (a, b) {
+    return Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  }
+
+  /**
+   * Assigns every label a hue kept apart from all others, so no two modules
+   * ever look the same color. Each label keeps its hash hue unless it lands
+   * within MIN_HUE_GAP of an already-taken one — then it gets the hue
+   * farthest from everything taken so far. Deterministic per label set.
+   */
+  function assignDefaultHues (modules) {
+    const MIN_HUE_GAP = 24;
+    const labels = [...new Set(modules.map((module) => module.label))].toSorted(compareByName);
+    const taken = [];
+    const hues = new Map();
+    for (const label of labels) {
+      let hue = hueForName(label);
+      if (taken.some((t) => hueDistance(t, hue) < MIN_HUE_GAP)) {
+        let best = hue,
+          bestGap = -1;
+        for (let candidate = 0; candidate < 360; candidate += 1) {
+          const gap = Math.min(...taken.map((t) => hueDistance(t, candidate)));
+          if (gap > bestGap) {
+            bestGap = gap;
+            best = candidate;
+          }
+        }
+        hue = best;
+      }
+      taken.push(hue);
+      hues.set(label, hue);
+    }
+    return hues;
+  }
+
+  // Hex so the value can seed an <input type="color"> directly
   function colorForName (name) {
-    return `hsl(${hueForName(name)}, 65%, 55%)`;
+    const hue = state.defaultHues?.get(name) ?? hueForName(name);
+    return state.colorOverrides[name] ?? hslToHex(hue, 65, 55);
   }
 
-  function colorBgForName (name) {
-    return `hsla(${hueForName(name)}, 65%, 55%, 0.16)`;
+  function colorBgFor (hex) {
+    const r = Number.parseInt(hex.slice(1, 3), 16);
+    const g = Number.parseInt(hex.slice(3, 5), 16);
+    const b = Number.parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.16)`;
   }
 
   /* ---------- layout state ---------- */
@@ -169,12 +237,13 @@
       block.classList.add("lp-hidden");
     }
     block.dataset.identifier = module.identifier;
-    block.style.setProperty("--lp-color", colorForName(module.name));
-    block.style.setProperty("--lp-color-bg", colorBgForName(module.name));
-    block.textContent = module.name;
+    const color = colorForName(module.label);
+    block.style.setProperty("--lp-color", color);
+    block.style.setProperty("--lp-color-bg", colorBgFor(color));
+    block.textContent = module.label;
     block.title = module.header
-      ? `${module.name} (${module.header})`
-      : module.name;
+      ? `${module.label} (${module.header})`
+      : module.label;
     block.addEventListener("pointerdown", onPointerDown);
     return block;
   }
@@ -261,24 +330,68 @@
 
   /**
    * Adds a color swatch to each module's row in #visible-modules-results so
-   * the list and the preview read as linked.
+   * the list and the preview read as linked. Clicking a swatch opens a color
+   * picker; the choice is stored per module name in localStorage.
    */
   function decorateList () {
     for (const module of state.modules) {
       const item = document.getElementById(module.identifier);
-      if (!item || item.querySelector(".lp-swatch")) {
+      if (!item) {
         continue;
       }
-      const swatch = document.createElement("span");
-      swatch.className = "lp-swatch";
-      swatch.style.backgroundColor = colorForName(module.name);
-      const text = item.querySelector(".text");
-      if (text) {
-        text.before(swatch);
-      } else {
-        item.append(swatch);
+      let swatch = item.querySelector(".lp-swatch");
+      if (!swatch) {
+        swatch = document.createElement("span");
+        swatch.className = "lp-swatch";
+        swatch.title = "Change color";
+        const text = item.querySelector(".text");
+        if (text) {
+          text.before(swatch);
+        } else {
+          item.append(swatch);
+        }
+        attachColorPicker(swatch, module.label);
+      }
+      const color = colorForName(module.label);
+      swatch.style.backgroundColor = color;
+      const input = swatch.querySelector(".lp-color-input");
+      if (input) {
+        input.value = color;
       }
     }
+  }
+
+  function stopClickPropagation (event) {
+    event.stopPropagation();
+  }
+
+  /**
+   * Wires an <input type="color"> to a list swatch. The input is an
+   * invisible overlay on the dot (slightly larger tap target) and receives
+   * the tap directly — iOS Safari won't open the picker from a programmatic
+   * click() on a hidden input. stopPropagation keeps the tap from toggling
+   * the module row's show/hide handler.
+   */
+  function attachColorPicker (swatch, moduleLabel) {
+    const input = document.createElement("input");
+    input.type = "color";
+    input.className = "lp-color-input";
+    input.setAttribute("aria-label", `Color for ${moduleLabel}`);
+    input.value = colorForName(moduleLabel);
+    swatch.append(input);
+
+    input.addEventListener("click", stopClickPropagation);
+    swatch.addEventListener("click", stopClickPropagation);
+
+    // iOS fires "change" on confirm; desktop browsers fire "input" live
+    const apply = () => {
+      state.colorOverrides[moduleLabel] = input.value;
+      localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(state.colorOverrides));
+      render();
+      decorateList();
+    };
+    input.addEventListener("input", apply);
+    input.addEventListener("change", apply);
   }
 
   /* ---------- drag and drop (pointer events, works for mouse + touch) ---------- */
@@ -605,10 +718,31 @@
     state.modules = positioned.map((module) => ({
       "identifier": module.identifier,
       "name": module.name,
+      "label": module.name,
       "position": module.position,
       "hidden": Boolean(module.hidden),
       "header": module.header
     }));
+
+    /*
+     * Same module twice (e.g. two weather instances)? Number them so each
+     * gets its own label — and with it, its own color.
+     */
+    const nameCounts = new Map();
+    for (const module of state.modules) {
+      nameCounts.set(module.name, (nameCounts.get(module.name) ?? 0) + 1);
+    }
+    const numbered = new Map();
+    for (const module of state.modules) {
+      if (nameCounts.get(module.name) < 2) {
+        continue;
+      }
+
+      const n = (numbered.get(module.name) ?? 0) + 1;
+      numbered.set(module.name, n);
+      module.label = `${module.name} ${n}`;
+    }
+    state.defaultHues = assignDefaultHues(state.modules);
     state.byIdentifier = new Map(state.modules.map((module) => [module.identifier, module]));
     state.baseline = buildBaseline(state.modules);
     // Keep unsaved drag edits across menu re-entries within this page load

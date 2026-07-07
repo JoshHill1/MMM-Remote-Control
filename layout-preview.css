@@ -215,9 +215,10 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
 }
 
-/* Color swatch linking a list row to its preview block */
+/* Color swatch linking a list row to its preview block (click to change) */
 
 .lp-swatch {
+  position: relative;
   display: inline-block;
   flex: 0 0 auto;
   width: 10px;
@@ -225,4 +226,24 @@
   margin-inline: 2px 6px;
   border-radius: 50%;
   vertical-align: middle;
+  cursor: pointer;
+}
+
+.lp-swatch:hover {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 1px;
+}
+
+/*
+ * Invisible overlay on the dot; extends past it for a finger-sized tap
+ * target. Must stay tappable (no pointer-events: none, no display: none)
+ * or iOS Safari won't open its color picker.
+ */
+.lp-color-input {
+  position: absolute;
+  inset: -10px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
