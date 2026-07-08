@@ -769,13 +769,16 @@ module.exports = NodeHelper.create({
       if (!app) { throw "Could not get Electron app instance."; }
 
       /*
-       * When running under a process manager like pm2, skip app.relaunch()
-       * to avoid spawning a duplicate instance (pm2 will restart automatically).
+       * When running under a process manager (pm2, systemd), skip
+       * app.relaunch() to avoid spawning a duplicate instance — the manager
+       * restarts the exited process itself. A relaunched Electron escapes
+       * the manager's control and fights the managed instance over the port
+       * and the display. systemd sets INVOCATION_ID for service processes.
        */
-      const isManagedProcess = process.env.PM2_HOME || process.env.pm_id !== undefined;
+      const isManagedProcess = process.env.PM2_HOME || process.env.pm_id !== undefined || process.env.INVOCATION_ID !== undefined;
 
       if (isManagedProcess) {
-        Log.log("Running under pm2 (or similar process manager), exiting cleanly for managed restart...");
+        Log.log("Running under a process manager (pm2/systemd), exiting cleanly for managed restart...");
         this.sendResponse(response, undefined, {action: "RESTART", info: "Exiting for process manager restart..."});
 
         if (response && response.on) {

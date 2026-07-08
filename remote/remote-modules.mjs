@@ -1,6 +1,12 @@
 import {Remote} from "./remote.mjs";
 import {marked} from "marked";
 
+/*
+ * Layout preview: side-effect import so it works without a mirror restart
+ * (node_helper serves a startup-cached remote.html, this file is read fresh)
+ */
+import "../layout-preview.js";
+
 /**
  * Module management methods for MMM-Remote-Control.
  * Covers module visibility toggling, installing, updating, and class management.
@@ -214,6 +220,12 @@ Object.assign(
           );
 
         }
+
+        // Hook for the layout preview (layout-preview.js)
+        document.dispatchEvent(new CustomEvent(
+          "mmrc-modules-loaded",
+          {"detail": {"modules": moduleData, "remote": this}}
+        ));
 
       } catch (error) {
 

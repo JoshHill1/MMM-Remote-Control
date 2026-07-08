@@ -106,4 +106,62 @@ describe("MMM-Remote-Control.js module", () => {
       }, payload);
     });
   });
+
+  test("hiding a module re-shows a visible sibling stuck at position:fixed", () => {
+    const shown = [];
+    const makeModule = (identifier, position, hidden) => ({
+      identifier,
+      name: identifier,
+      data: {position},
+      hidden,
+      lockStrings: [],
+      hide (speed, callback) { callback(); },
+      show () { shown.push(identifier); }
+    });
+
+    const target = makeModule("module_1_pix", "bottom_left", false);
+    const stuckSibling = makeModule("module_2_qr", "bottom_left", false);
+    const hiddenSibling = makeModule("module_3_news", "bottom_left", true);
+    const otherRegion = makeModule("module_4_clock", "top_left", false);
+    const allModules = [target, stuckSibling, hiddenSibling, otherRegion];
+
+    for (const module of allModules) {
+      const wrapper = window.document.createElement("div");
+      wrapper.id = module.identifier;
+      window.document.body.append(wrapper);
+    }
+
+    /*
+     * The stuck sibling reports visible but its wrapper is out of static flow;
+     * the hidden sibling is legitimately hidden and must stay that way.
+     */
+    window.document.getElementById(stuckSibling.identifier).style.position = "fixed";
+    window.document.getElementById(hiddenSibling.identifier).style.position = "fixed";
+
+    window.MM.getModules = () => allModules;
+
+    Module.handleModuleVisibility.call({
+      identifier: "module_0_MMM-Remote-Control",
+      name: "MMM-Remote-Control",
+      getModulesByFilter: Module.getModulesByFilter,
+      restoreStuckSiblings: Module.restoreStuckSiblings
+    }, "HIDE", {module: "module_1_pix"});
+
+    assert.deepEqual(shown, ["module_2_qr"]);
+  });
+
+  test("getModulesByFilter warns when one name matches multiple instances", () => {
+    const warnings = [];
+    window.Log.warn = (message) => { warnings.push(message); };
+    window.MM.getModules = () => [
+      {identifier: "module_1_MMM-EasyPix", name: "MMM-EasyPix"},
+      {identifier: "module_2_MMM-EasyPix", name: "MMM-EasyPix"}
+    ];
+
+    const matches = Module.getModulesByFilter.call({name: "MMM-Remote-Control"}, "MMM-EasyPix");
+
+    assert.equal(matches.length, 2);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /module_1_MMM-EasyPix, module_2_MMM-EasyPix/u);
+  });
 });

@@ -37,6 +37,40 @@ const getActions = (handler) => {
 };
 
 /**
+ * Resolve an API module name/identifier to matching module data entries.
+ * Tries exact identifier, exact name, partial identifier/urlPath, then
+ * partial name matching; logs a warning when several instances match.
+ * @param {string} name - Module name or identifier from the request path
+ * @param {Array} dataMerged - Combined module data
+ * @returns {Array} Matching module data entries
+ */
+const findModuleData = (name, dataMerged) => {
+  // First, try exact match on identifier (for specific instances like "module_0_MMM-MotionEye")
+  let moduleData = dataMerged.filter((m) => m.identifier === name);
+
+  // If no exact match, try exact match on module name
+  if (moduleData.length === 0) {
+    moduleData = dataMerged.filter((m) => m.name === name);
+  }
+
+  // If still no match, try partial match on identifier (for urlPath or custom identifiers)
+  if (moduleData.length === 0) {
+    moduleData = dataMerged.filter((m) => m.identifier.includes(name) || (m.urlPath && m.urlPath.includes(name)));
+  }
+
+  // Finally, try partial match on module name (for backwards compatibility)
+  if (moduleData.length === 0) {
+    moduleData = dataMerged.filter((m) => m.name.includes(name) || name.includes(m.name));
+  }
+
+  if (moduleData.length > 1) {
+    console.warn(`answerModuleApi: "${name}" matched ${moduleData.length} module instances: ${moduleData.map((m) => m.identifier).join(", ")}`);
+  }
+
+  return moduleData;
+};
+
+/**
  * Registers color-related API routes (zoom, background color, font color).
  * Extracted to keep createApiRoutes within line limits.
  * @param {object} router - Express router
@@ -410,29 +444,9 @@ module.exports = {
       return;
     }
 
-    let moduleData;
-    if (request.params.moduleName === "all") {
-      moduleData = dataMerged;
-    } else {
-      const name = request.params.moduleName;
-      // First, try exact match on identifier (for specific instances like "module_0_MMM-MotionEye")
-      moduleData = dataMerged.filter((m) => m.identifier === name);
-
-      // If no exact match, try exact match on module name
-      if (moduleData.length === 0) {
-        moduleData = dataMerged.filter((m) => m.name === name);
-      }
-
-      // If still no match, try partial match on identifier (for urlPath or custom identifiers)
-      if (moduleData.length === 0) {
-        moduleData = dataMerged.filter((m) => m.identifier.includes(name) || (m.urlPath && m.urlPath.includes(name)));
-      }
-
-      // Finally, try partial match on module name (for backwards compatibility)
-      if (moduleData.length === 0) {
-        moduleData = dataMerged.filter((m) => m.name.includes(name) || name.includes(m.name));
-      }
-    }
+    const moduleData = request.params.moduleName === "all"
+      ? dataMerged
+      : findModuleData(request.params.moduleName, dataMerged);
 
     if (moduleData.length === 0) {
       response.status(400).json({success: false, message: "Module Name or Identifier Not Found!"});
