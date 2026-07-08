@@ -217,13 +217,27 @@
 
 /* Color swatch linking a list row to its preview block (click to change) */
 
+/*
+ * Flex layout pushes the swatch to the row's far end, away from the
+ * show/hide toggle, so the picker's tap target can't swallow toggle taps.
+ */
+#visible-modules-results .module-line {
+  display: flex;
+  align-items: center;
+}
+
+#visible-modules-results .module-line .text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .lp-swatch {
   position: relative;
   display: inline-block;
   flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  margin-inline: 2px 6px;
+  width: 14px;
+  height: 14px;
+  margin-inline: 8px 2px;
   border-radius: 50%;
   vertical-align: middle;
   cursor: pointer;
@@ -237,11 +251,12 @@
 /*
  * Invisible overlay on the dot; extends past it for a finger-sized tap
  * target. Must stay tappable (no pointer-events: none, no display: none)
- * or iOS Safari won't open its color picker.
+ * or iOS Safari won't open its color picker. Kept small toward the label
+ * (left) so it never swallows taps meant for the row's show/hide toggle.
  */
 .lp-color-input {
   position: absolute;
-  inset: -10px;
+  inset: -8px -8px -8px -4px;
   opacity: 0;
   border: 0;
   padding: 0;

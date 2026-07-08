@@ -421,6 +421,27 @@ Module.register("MMM-Remote-Control", {
       return filters.some((f) => module.identifier === f || module.name === f);
     });
 
+    /*
+     * Stale identifier fallback: saving a layout reorders config.modules,
+     * which renumbers module_<n>_<name> identifiers on the next restart. A
+     * remote page from before the restart then targets identifiers that no
+     * longer exist and SHOW/HIDE would silently do nothing. Recover via the
+     * name embedded in the identifier when it maps to exactly one instance.
+     */
+    if (matches.length === 0) {
+      for (const f of filters) {
+        if (typeof f !== "string") continue;
+        const parsed = (/^module_\d+_(.+)$/u).exec(f);
+        if (!parsed) continue;
+        const name = parsed[1].split("/").pop();
+        const byName = allModules.filter((module) => module && module.name === name);
+        if (byName.length === 1) {
+          Log.warn(`${this.name}: "${f}" is a stale identifier, matching by module name "${name}"`);
+          matches.push(byName[0]);
+        }
+      }
+    }
+
     if (!Array.isArray(filter) && matches.length > 1) {
       Log.warn(`${this.name}: "${filter}" matched ${matches.length} module instances: ${matches.map((module) => module.identifier).join(", ")}`);
     }

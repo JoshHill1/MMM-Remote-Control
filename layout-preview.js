@@ -344,12 +344,13 @@
         swatch = document.createElement("span");
         swatch.className = "lp-swatch";
         swatch.title = "Change color";
-        const text = item.querySelector(".text");
-        if (text) {
-          text.before(swatch);
-        } else {
-          item.append(swatch);
-        }
+
+        /*
+         * Far end of the row, away from the show/hide toggle: the picker
+         * overlay must never sit between the toggle icon and the label
+         * where it would swallow hide/show taps.
+         */
+        item.append(swatch);
         attachColorPicker(swatch, module.label);
       }
       const color = colorForName(module.label);
